@@ -63,9 +63,27 @@ classdef q_model
             %% Load data for wealth and consumption
             par.c = filtered .riceexp + filtered .educex_2 + filtered .hlthex_1 + filtered .waterexp + filtered .elecexp;
             par.a0 = par.income - par.c ;
+             %% Simulation parameters.
+            par.seed = 2025; % Seed for simulation
+            par.T = 60; %Last Period
+            par.TT = 61; % Number of time periods.
+            par.t_r = 41; % Retirement period
+            par.NN = 3000;
             %% Preferences.
-            par.beta = 0.95; % Discount factor
-            par.sigma = 1.00; % CRRA
+            par.beta = 0.94; % Discount factor
+            %beta_values = [0.90, 0.92, 0.94, 0.96];
+           
+            % Store results
+            %consumption_profiles = zeros(length(beta_values), par.T);
+            %wealth_profiles = zeros(length(beta_values), par.T);
+            
+            % Loop over beta values
+            %for i = 1:length(beta_values)
+                % Setup and configure parameters
+                %par = q_model.setup();
+                %par.beta = beta_values(i);
+            %end
+            par.sigma = 2.00; % CRRA
             par.y_bar = 3.50; % Labor income
             par.k = 0.3;
             par.r = 0.15;
@@ -73,12 +91,6 @@ classdef q_model
             par.rho = 0.85; % Persistence of AR(1) process
             par.mu = 0.0; % Intercept of AR(1) process
             
-            %% Simulation parameters.
-            par.seed = 2025; % Seed for simulation
-            par.T = 60; %Last Period
-            par.TT = 61; % Number of time periods.
-            par.t_r = 41; % Retirement period
-            par.NN = 1000;
             %% Store G_t Data in Model Parameters
             par.Gt_table = results; % Save G_t_data in the parameter structure
             

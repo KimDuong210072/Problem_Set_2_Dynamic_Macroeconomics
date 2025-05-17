@@ -100,6 +100,35 @@ classdef q_my_graph
                     xlabel({'$Age$'},'Interpreter','latex')
                     ylabel({'$u^{sim}_t$'},'Interpreter','latex')
             title('LCP of Utility')
+            % Plot consumption profiles
+                %for t = 1:par.T
+                    %consumption_profiles(t) = mean(sim.csim(sim.tsim == t), 'omitnan');
+                    %wealth_profiles(t) = mean(sim.Asim(sim.tsim == t), 'omitnan');
+                %end
+                %figure;
+                %hold on;
+                %for i = 1:length(beta_values)
+                    %plot(1:T, consumption_profiles(i,:), 'DisplayName', ['\beta = ' num2str(beta_values(i))]);
+                %end
+                %xlabel('Age');
+                %ylabel('Average Consumption');
+                %title('Life-Cycle Consumption Profiles for \gamma = 2.00');
+                %legend show;
+                %grid on;
+                %hold off;
+                
+                % Plot wealth profiles
+                %figure;
+                %hold on;
+                %for i = 1:length(beta_values)
+                    %plot(1:T, wealth_profiles(i,:), 'DisplayName', ['\beta = ' num2str(beta_values(i))]);
+                %end
+                %xlabel('Age');
+                %ylabel('Average Wealth');
+                %title('Life-Cycle Wealth Profiles for \gamma = 2.00');
+                %legend show;
+                %grid on;
+                %hold off;
             end
       end
 end
