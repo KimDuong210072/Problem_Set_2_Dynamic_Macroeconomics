@@ -1,123 +1,117 @@
-%% File Info.
-
-%{
-
-    simulate.m
-    ----------
-    This code simulates the model.
-
-%}
-
-%% Simulate class.
-
 classdef qb_simulate
     methods(Static)
-        %% Simulate the model. 
-        
-        function sim = lc(par,sol)            
-            %% Set up.
-            
-            agrid = par.agrid; % Assets today (state variable).
+        function sim = lc(par, sol)
+            % Set up
+            agrid = par.agrid;
+            apol = sol.a;
+            cpol = sol.c;
 
-            apol = sol.a; % Policy function for capital.
-            cpol = sol.c; % Policy function for consumption.
+            TT = par.TT;
+            NN = par.NN;
+            T = par.T;
+            tr = par.t_r;
 
-            TT = par.TT; % Time periods.
-            NN = par.NN; % People.
-            T = par.T; % Life span.
-            tr = par.t_r; % Retirement.
+            kappa = par.k;
+            ygrid = par.ygrid;
+            pmat = par.pmat;
 
-            kappa = par.k; % Share of income as pension.
-            ygrid = par.ygrid; % Exogenous income.
-            pmat = par.pmat; % Transition matrix.
+            phi = par.phi;
+            gold0 = mean(par.gold);
 
-            ysim = nan(TT,NN); % Container for simulated income.
-            Asim = nan(TT,NN); % Container for simulated savings.
-            tsim = nan(TT,NN); % Container for simulated age.
-            csim = nan(TT,NN); % Container for simulated consumption.
-            usim = nan(TT,NN); % Container for simulated utility.
-            ksim = nan(TT,NN);
-            isim = nan(TT,NN);
-            
-          
+            ysim = nan(TT, NN);
+            Asim = nan(TT, NN);
+            tsim = nan(TT, NN);
+            csim = nan(TT, NN);
+            usim = nan(TT, NN);
+            goldsim = nan(TT, NN);
+
             rng(par.seed);
 
-            pmat0 = pmat^100; % Stationary distirbution.
-            cmat = cumsum(pmat,2); % CDF matrix.
+            pmat0 = pmat^100;
+            cmat = cumsum(pmat, 2);
 
-            y0_ind = randsample(par.ylen,NN,true,pmat0(1,:))'; % Index for initial income.
-            a0_ind = randsample(par.alen,NN,true)'; % Index for initial wealth.
-            t0_ind = randsample(T,NN,true)'; % Index for initial wealth.
-            yr = nan(NN,1); % Retirement income
+            y0_ind = randsample(par.ylen, NN, true, pmat0(1,:))';
+            a0_ind = arrayfun(@(a0) find(abs(agrid - a0) == min(abs(agrid - a0)), 1), par.a0(:));
+            t0_ind = randsample(T, NN, true)'; % Initial age
+            yr = nan(NN, 1); % Retirement income
 
-            for i = 1:NN % Person loop.
-                
-                if t0_ind(i)>=tr % Retired now.
-                    yr(i) = ygrid(y0_ind(i)); % Store for pension.
-                    ysim(1,i) = kappa.*yr(i); % Pension in period 0 given age.
+            for i = 1:NN
+                age0 = t0_ind(i);
+                tsim(1,i) = age0;
+
+                if age0 == 1
+                    goldsim(1,i) = -gold0;
+                else
+                    goldsim(1,i) = gold0 * (1 + phi)^(age0 - 1);
+                end
+
+                if age0 >= tr
+                    yr(i) = ygrid(y0_ind(i));
+                    ysim(1,i) = kappa * yr(i);
                 else
                     ysim(1,i) = ygrid(y0_ind(i));
                 end
 
-                tsim(1,i) = t0_ind(i); % Age in period 0.
-                csim(1,i) = cpol(a0_ind(i),t0_ind(i),y0_ind(i)); % Consumption in period 0 given a0.
-                Asim(1,i) = apol(a0_ind(i),t0_ind(i),y0_ind(i)); % Savings for period 1 given a0.
+                csim(1,i) = cpol(a0_ind(i), age0, y0_ind(i)) + goldsim(1,i);
+                Asim(1,i) = apol(a0_ind(i), age0, y0_ind(i));
+                usim(1,i) = qb_model.utility(csim(1,i), par);
 
-                if t0_ind(i) == tr-1 % Retired next period.
-                    yr(i) = ygrid(y0_ind(i)); % Store as pension for next period
-                elseif t0_ind(i) < tr-1
-                    y1_ind = find(rand<=cmat(y0_ind(i),:)); % Draw income shock for next period.
-                    y0_ind(i) = y1_ind(1);
+                if age0 < tr - 1
+                    draw = rand;
+                    y0_ind(i) = find(draw <= cmat(y0_ind(i),:), 1, 'first');
+                elseif age0 == tr - 1
+                    yr(i) = ygrid(y0_ind(i));
                 end
-
             end
 
-            usim(1,:) = qb_model.utility(csim(1,:),par); % Utility in period 0 given a0.
+            % Recursive simulation
+            for j = 2:TT
+                for i = 1:NN
+                    age = tsim(j-1,i) + 1;
 
-            %% Simulate endogenous variables.
-
-            for j = 2:TT % Time loop.
-                for i = 1:NN % Person loop.
-
-                    age = tsim(j-1,i)+1; % Age in period t.
-
-                    if age <= T % Check if still alive.
-                        
-                        if age>=tr % Retired
-                            ysim(j,i) = kappa.*yr(i); % Pension in period t given age.
+                    if age <= T
+                        tsim(j,i) = age;
+                        if age >= tr
+                            yval = kappa * yr(i);
                         else
-                            ysim(j,i) = ygrid(y0_ind(i)); % Pension in period t given age.
+                            yval = ygrid(y0_ind(i));
+                        end
+                        ysim(j,i) = yval;
+
+                        if age == 1
+                            goldsim(j,i) = -gold0;
+                        else
+                            goldsim(j,i) = gold0 * (1 + phi)^(age - 1);
                         end
 
-                        tsim(j,i) = age; % Age in period t.
-                        at_ind = find(Asim(j-1,i)==agrid); % Savings choice in the previous period is the state today. Find where the latter is on the grid.
-                        %kt_ind = find(ksim(j-1,i)==kgrid);
-                        csim(j,i) = cpol(at_ind,age,y0_ind(i)); % Consumption in period t.
-                        Asim(j,i) = apol(at_ind,age,y0_ind(i)); % Savings for period t+1.
-                        %ksim(j) = kpol(kt_ind,A0_ind); % Capital stock for period t+1.
-                        %isim(j) = ipol(kt_ind,A0_ind); % Investment in period t.
-                        usim(j) = q_model.utility(csim(j),par); % Utility in period t.
-                        if age == tr-1 % Retire next period
-                            yr(i) = ygrid(y0_ind(i)); % Store as pension for next period
-                        elseif age < tr-1
-                            y1_ind = find(rand<=cmat(y0_ind(i),:)); % Draw income shock for next period.
-                            y0_ind(i) = y1_ind(1);
+                        % Find closest index
+                        [~, at_ind] = min(abs(agrid - Asim(j-1,i)));
+                        if at_ind < 1 || at_ind > length(agrid)
+                            at_ind = max(1, min(at_ind, length(agrid)));  % Clamp index
                         end
 
+                        csim(j,i) = cpol(at_ind, age, y0_ind(i)) + goldsim(j,i);
+                        Asim(j,i) = apol(at_ind, age, y0_ind(i));
+                        usim(j,i) = qb_model.utility(csim(j,i), par);
+
+                        if age < tr - 1
+                            draw = rand;
+                            y0_ind(i) = find(draw <= cmat(y0_ind(i),:), 1, 'first');
+                        elseif age == tr - 1
+                            yr(i) = ygrid(y0_ind(i));
+                        end
                     end
                 end
             end
 
+            % Output struct
             sim = struct();
-            
-            sim.ysim = ysim; % Simulated output.
-            sim.Asim = Asim; % Simulated savings.
-            sim.tsim = tsim; % Simulated age.
-            sim.csim = csim; % Simulated consumption.
-            sim.usim = usim; % Simulated utility.
-            %sim.ksim = ksim;
-             
+            sim.ysim = ysim;
+            sim.Asim = Asim;
+            sim.tsim = tsim;
+            sim.csim = csim;
+            sim.usim = usim;
+            sim.goldsim = goldsim;
         end
-        
     end
 end

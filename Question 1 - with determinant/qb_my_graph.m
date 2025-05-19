@@ -1,134 +1,115 @@
-%% File Info.
-
-%{
-
-    my_graph.m
-    ----------
-    This code plots the value and policy functions and the time path of the variables.
-
-%}
-
-%% Graph class.
-
 classdef qb_my_graph
     methods(Static)
-        %% Plot value and policy functions.
-        
-        function [] = plot_policy(par,sol,sim)
-            %% Plot consumption policy function.
 
+        %% Plot policy and value functions
+        function [] = plot_policy(par, sol, sim)
+            %% Setup
             ystate = par.ygrid;
-            age = linspace(1,par.T,par.T);
-            
+            age = 1:par.T;
+
+            %% Consumption Policy Function
             figure(1)
-            
-            surf(age(1:5:end),ystate,squeeze(sol.c(1,1:5:end,:))')
-                xlabel({'t'},'Interpreter','latex')
-                ylabel({'$y_{t}$'},'Interpreter','latex') 
-                zlabel({'$c_{t}$'},'Interpreter','latex') 
-            title('Consumption Policy Function, Lowest $a_t$','Interpreter','latex')
-            
+            surf(age(1:5:end), ystate, squeeze(sol.c(1,1:5:end,:))')
+            xlabel('$t$', 'Interpreter', 'latex')
+            ylabel('$y_t$', 'Interpreter', 'latex') 
+            zlabel('$c_t$', 'Interpreter', 'latex') 
+            title('Consumption Policy Function: Lowest $a_t$', 'Interpreter', 'latex')
+            shading interp; view(135,30)
+
             figure(2)
-            
-            surf(age(1:5:end),ystate,squeeze(sol.c(end,1:5:end,:))')
-                xlabel({'t'},'Interpreter','latex')
-                ylabel({'$y_{t}$'},'Interpreter','latex') 
-                zlabel({'$c_{t}$'},'Interpreter','latex') 
-            title('Consumption Policy Function, Highest $a_t$','Interpreter','latex')
-            
-            %% Plot saving policy function.
-            
+            surf(age(1:5:end), ystate, squeeze(sol.c(end,1:5:end,:))')
+            xlabel('$t$', 'Interpreter', 'latex')
+            ylabel('$y_t$', 'Interpreter', 'latex') 
+            zlabel('$c_t$', 'Interpreter', 'latex') 
+            title('Consumption Policy Function: Highest $a_t$', 'Interpreter', 'latex')
+            shading interp; view(135,30)
+
+            %% Saving Policy Function
             figure(3)
-            
-            surf(age(1:5:end),ystate,squeeze(sol.a(1,1:5:end,:))')
-                xlabel({'t'},'Interpreter','latex')
-                ylabel({'$y_{t}$'},'Interpreter','latex') 
-                zlabel({'$a_{t+1}$'},'Interpreter','latex') 
-            title('Saving Policy Function, Lowest $a_t$','Interpreter','latex')
-            
+            surf(age(1:5:end), ystate, squeeze(sol.a(1,1:5:end,:))')
+            xlabel('$t$', 'Interpreter', 'latex')
+            ylabel('$y_t$', 'Interpreter', 'latex') 
+            zlabel('$a_{t+1}$', 'Interpreter', 'latex') 
+            title('Saving Policy Function: Lowest $a_t$', 'Interpreter', 'latex')
+            shading interp; view(135,30)
+
             figure(4)
-            
-            surf(age(1:5:end),ystate,squeeze(sol.a(end,1:5:end,:))')
-                xlabel({'t'},'Interpreter','latex')
-                ylabel({'$y_{t}$'},'Interpreter','latex') 
-                zlabel({'$a_{t+1}$'},'Interpreter','latex') 
-            title('Saving Policy Function, Highest $a_t$','Interpreter','latex')
-            
-            %% Plot value function.
-            
-            figure(5)
-            
-            surf(age(1:5:end),ystate,squeeze(sol.v(1,1:5:end,:))')
-                xlabel({'t'},'Interpreter','latex')
-                ylabel({'$y_{t}$'},'Interpreter','latex') 
-                zlabel({'$v_t(a_t,t)$'},'Interpreter','latex')
-            title('Value Function, Lowest $a_t$','Interpreter','latex')
+            surf(age(1:5:end), ystate, squeeze(sol.a(end,1:5:end,:))')
+            xlabel('$t$', 'Interpreter', 'latex')
+            ylabel('$y_t$', 'Interpreter', 'latex') 
+            zlabel('$a_{t+1}$', 'Interpreter', 'latex') 
+            title('Saving Policy Function: Highest $a_t$', 'Interpreter', 'latex')
+            shading interp; view(135,30)
 
-            figure(6)
-            
-            surf(age(1:5:end),ystate,squeeze(sol.v(end,1:5:end,:))')
-                xlabel({'t'},'Interpreter','latex')
-                ylabel({'$y_{t}$'},'Interpreter','latex') 
-                zlabel({'$v_t(a_t,t)$'},'Interpreter','latex')
-            title('Value Function, Highest $a_t$','Interpreter','latex')
+            %% Value Function
+            if isfield(sol, 'v')
+                figure(5)
+                surf(age(1:5:end), ystate, squeeze(sol.v(1,1:5:end,:))')
+                xlabel('$t$', 'Interpreter', 'latex')
+                ylabel('$y_t$', 'Interpreter', 'latex') 
+                zlabel('$v_t(a_t,t)$', 'Interpreter', 'latex')
+                title('Value Function: Lowest $a_t$', 'Interpreter', 'latex')
+                shading interp; view(135,30)
 
-            %% Plot consumption policy function.
-            
-            lcp_c = nan(par.T,1);
-            lcp_a = nan(par.T,1);
-            lcp_u = nan(par.T,1);
-            
-                for i=1:par.T
-                    lcp_c(i) = mean(sim.csim(sim.tsim==i),"omitnan");
-                    lcp_a(i) = mean(sim.Asim(sim.tsim==i),"omitnan");
-                    lcp_u(i) = mean(sim.usim(sim.tsim==i),"omitnan");
-                end
-            figure(7)
-            plot(age,lcp_c)
-                    xlabel({'$Age$'},'Interpreter','latex')
-                    ylabel({'$c^{sim}_{t}$'},'Interpreter','latex')
-            title('LCP of Consumption')
-            %% Plot saving policy function.
-            figure(8)
-            plot(age,lcp_a)
-                    xlabel({'$Age$'},'Interpreter','latex')
-                    ylabel({'$a^{sim}_{t+1}$'},'Interpreter','latex')
-            title('LCP of Savings')
-            %% Plot value function.
-            figure(9)
-            plot(age,lcp_u)
-                    xlabel({'$Age$'},'Interpreter','latex')
-                    ylabel({'$u^{sim}_t$'},'Interpreter','latex')
-            title('LCP of Utility')
-            % Plot consumption profiles
-                %for t = 1:par.T
-                    %consumption_profiles(t) = mean(sim.csim(sim.tsim == t), 'omitnan');
-                    %wealth_profiles(t) = mean(sim.Asim(sim.tsim == t), 'omitnan');
-                %end
-                %figure;
-                %hold on;
-                %for i = 1:length(beta_values)
-                    %plot(1:T, consumption_profiles(i,:), 'DisplayName', ['\beta = ' num2str(beta_values(i))]);
-                %end
-                %xlabel('Age');
-                %ylabel('Average Consumption');
-                %title('Life-Cycle Consumption Profiles for \gamma = 2.00');
-                %legend show;
-                %grid on;
-                %hold off;
-                
-                % Plot wealth profiles
-                %figure;
-                %hold on;
-                %for i = 1:length(beta_values)
-                    %plot(1:T, wealth_profiles(i,:), 'DisplayName', ['\beta = ' num2str(beta_values(i))]);
-                %end
-                %xlabel('Age');
-                %ylabel('Average Wealth');
-                %title('Life-Cycle Wealth Profiles for \gamma = 2.00');
-                %legend show;
-                %grid on;
-                %hold off;
+                figure(6)
+                surf(age(1:5:end), ystate, squeeze(sol.v(end,1:5:end,:))')
+                xlabel('$t$', 'Interpreter', 'latex')
+                ylabel('$y_t$', 'Interpreter', 'latex') 
+                zlabel('$v_t(a_t,t)$', 'Interpreter', 'latex')
+                title('Value Function: Highest $a_t$', 'Interpreter', 'latex')
+                shading interp; view(135,30)
             end
-      end
+
+            %% Life-Cycle Profiles (Smoothed)
+            lcp_c = qb_my_graph.mean_by_age(sim.csim, sim.tsim, par.T);
+            lcp_a = qb_my_graph.mean_by_age(sim.Asim, sim.tsim, par.T);
+            lcp_u = qb_my_graph.mean_by_age(sim.usim, sim.tsim, par.T);
+            lcp_g = qb_my_graph.mean_by_age(sim.goldsim, sim.tsim, par.T);
+
+            figure(7)
+            plot(age, lcp_c, 'LineWidth', 1.5)
+            xlabel('Age', 'Interpreter', 'latex')
+            ylabel('$c^{\mathrm{sim}}_t$', 'Interpreter', 'latex')
+            title('LCP of Consumption')
+            grid on
+            
+            figure(8)
+            plot(age, lcp_a, 'b', 'LineWidth', 1.5)
+            xlabel('Age', 'Interpreter', 'latex')
+            ylabel('$a^{\mathrm{sim}}_{t+1}$', 'Interpreter', 'latex')
+            title('LCP of Savings')
+            grid on
+            
+            figure(9)
+            plot(age, lcp_u, 'LineWidth', 1.5)
+            xlabel('Age', 'Interpreter', 'latex')
+            ylabel('$u^{\mathrm{sim}}_t$', 'Interpreter', 'latex')
+            title('LCP of Utility')
+            grid on
+            
+            figure(10)
+            plot(age, lcp_g, 'LineWidth', 1.5)
+            xlabel('Age', 'Interpreter', 'latex')
+            ylabel('$g^{\mathrm{sim}}_t$', 'Interpreter', 'latex')
+            title('LCP of Gold Holdings')
+            grid on
+        end
+
+        %% Smoothed mean by age with minimum sample count
+        function profile = mean_by_age(data, tsim, T)
+            profile = nan(T, 1);
+            valid = ~isnan(tsim) & tsim >= 1 & tsim <= T;
+            min_obs = 30;  % Require at least 30 people at each age
+
+            for t = 1:T
+                mask = valid & (tsim == t) & ~isnan(data);
+                if sum(mask(:)) >= min_obs
+                    profile(t) = mean(data(mask), 'omitnan');
+                end
+            end
+
+            % Smooth the result using moving average
+            profile = movmean(profile, 3, 'omitnan');
+        end
+    end
 end

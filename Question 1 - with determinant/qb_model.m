@@ -21,7 +21,8 @@ classdef qb_model
             % Load the data
             muc4a = readtable('muc4a.csv');
             muc123a = readtable('muc123a.csv');
-            hh_expe = readtable('hhexpe08.csv');  
+            hh_expe = readtable('hhexpe08.csv'); 
+            gold_data = readtable('muc5b4.csv'); 
             
             % Merge tables on keys: tinh, diaban, hoso, matv
             merged = outerjoin(muc4a, muc123a, ...
@@ -30,6 +31,10 @@ classdef qb_model
             merged = outerjoin(merged, hh_expe, ...
                     'Keys', {'tinh','huyen','xa', 'diaban', 'hoso'}, ...
                     'MergeKeys', true);
+            % Merge with gold purchase data
+            merged = outerjoin(merged, gold_data, ...
+                'Keys', {'tinh','huyen','xa','diaban','hoso'}, ...
+                'MergeKeys', true);
             % Keep only household heads who are male
             is_male_head = merged.m1ac3 == 1 & merged.m1ac2 == 1;
          
@@ -62,13 +67,17 @@ classdef qb_model
 
             %% Load data for wealth and consumption
             par.c = filtered .riceexp + filtered .educex_2 + filtered .hlthex_1 + filtered .waterexp + filtered .elecexp;
-            par.a0 = par.income - par.c ;
+            
+            par.gold = filtered.m5b4c2_3; % Store gold purchases
+            par.gold(isnan(par.gold)) = 0; % Replace missing with 0
+
+            par.a0 = par.income - par.c - par.gold;
              %% Simulation parameters.
             par.seed = 2025; % Seed for simulation
             par.T = 60; %Last Period
             par.TT = 61; % Number of time periods.
             par.t_r = 41; % Retirement period
-            par.NN = 3000;
+            par.NN = min(3000, length(par.a0)); 
             %% Preferences.
             par.beta = 0.94; % Discount factor
             %beta_values = [0.90, 0.92, 0.94, 0.96];
@@ -87,6 +96,7 @@ classdef qb_model
             par.y_bar = 3.50; % Labor income
             par.k = 0.3;
             par.r = 0.15;
+            par.phi = 0.005; % Annual appreciation of gold
             par.sigma_eps = 0.07; % Std. dev of productivity shocks
             par.rho = 0.85; % Persistence of AR(1) process
             par.mu = 0.0; % Intercept of AR(1) process
@@ -136,7 +146,7 @@ classdef qb_model
             assert(par.m > 0,'Scaling parameter for Tauchen should be positive.\n')
             assert(par.ylen > 3,'Grid size for y should be positive and greater than 3.\n')
 
-            [ygrid,pmat] = q_model.tauchen(par.mu,par.rho,par.sigma_eps,par.ylen,par.m); % Tauchen's Method to discretize the AR(1) process for log productivity.
+            [ygrid,pmat] = qb_model.tauchen(par.mu,par.rho,par.sigma_eps,par.ylen,par.m); % Tauchen's Method to discretize the AR(1) process for log productivity.
             par.ygrid = exp(ygrid); % The AR(1) is in logs so exponentiate it to get y.
             par.pmat = pmat; % Transition matrix.
 

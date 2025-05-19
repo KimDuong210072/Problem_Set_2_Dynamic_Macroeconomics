@@ -1,0 +1,188 @@
+classdef model
+    methods(Static)
+        %% Set up structure array for model parameters and set the simulation parameters.
+        function par = setup()            
+            %% Structure array for model parameters.
+            
+            par = struct();
+
+            % Reading file
+            data = readtable('ES_Vietnam_2005_2009_2015.csv', 'VariableNamingRule', 'preserve');
+            
+            % Define column names
+            id_col = 'id2015';
+            l1_col = 'l1';
+            n5a_col = 'n5a';
+            n5b_col = 'n5b';
+            
+            n2a_col = 'n2a';
+            n2e_col = 'n2e';
+            n2f_col = 'n2f';
+            n2b_col = 'n2b';
+            n3_col  = 'n3';
+            
+            % Step 1: Filter rows with valid data
+            validRows = ...
+                ~isnan(data.(id_col)) & ...
+                data.(l1_col) ~= 0 & ...
+                data.(n5a_col) ~= -9 & ...
+                data.(n5b_col) ~= -9 & ...
+                ~ismember(data.(n2a_col), [-7, -8]) & ...
+                ~ismember(data.(n2e_col), [-7, -8]) & ...
+                ~ismember(data.(n2f_col), [-7, -8]) & ...
+                ~ismember(data.(n2b_col), [-7, -8]) & ...
+                ~ismember(data.(n3_col), [-7, -9]);
+            
+            filteredData = data(validRows, :);
+            
+            % Step 2: Compute median of l1
+            median_l1 = median(filteredData.(l1_col));
+            
+            % Step 3: Assign group labels
+            group = strings(height(filteredData), 1);
+            group(filteredData.(l1_col) > median_l1) = "big";
+            group(filteredData.(l1_col) < median_l1) = "small";
+            group(filteredData.(l1_col) == median_l1) = "big";
+            
+            % Step 4: Compute capital in millions
+            capital_mil = (filteredData.(n5a_col) + filteredData.(n5b_col)) / 1e6;
+            
+            % Step 5: Compute total cost
+            total_cost = (filteredData.(n2a_col) + ...
+                         filteredData.(n2e_col) + ...
+                         filteredData.(n2f_col) + ...
+                         filteredData.(n2b_col))/ 1e6;
+            
+            % Step 6: Average revenue
+            avg_revenue = filteredData.(n3_col)/1e6;
+            
+            % Step 7: Compute profit
+            profit = avg_revenue - total_cost;
+            
+            % Step 8: Create the result table
+            resultTable = table( ...
+                filteredData.(id_col), ...
+                filteredData.(l1_col), ...
+                group, ...
+                capital_mil, ...
+                total_cost, ...
+                avg_revenue, ...
+                profit, ...
+                'VariableNames', {'id2015', 'l1', 'group', 'capital_mil', 'total_cost', 'avg_revenue', 'profit'});
+            
+            % Split by group
+            par.bigf = resultTable(resultTable.group == "big", :);
+            par.smallf = resultTable(resultTable.group == "small", :);
+            
+            % Display the full table once for debugging (optional)
+            disp(resultTable);
+
+            %% Technology parameters
+            par.beta = 0.96; % Discount factor
+            par.alpha = 0.7; % Capital's share of income
+            par.delta = 0.6; % Depreciation rate
+            
+            % Parameter checks
+            assert(par.delta >= 0.0 && par.delta <= 1.0, 'Depreciation rate must be between 0 and 1.');
+            assert(par.beta > 0.0 && par.beta < 1.0, 'Discount factor must be between 0 and 1.');
+            assert(par.alpha > 0.0 && par.alpha < 1.0, 'Capital share must be between 0 and 1.');
+
+            %% Prices, Income, and Costs
+            par.gamma = 1.00; % Adjustment cost coefficient
+            par.sigma_eps = 0.07; % Std dev of productivity shocks
+            par.rho = 0.85; % Persistence of AR(1)
+            par.mu = 0.0; % Intercept of AR(1)
+            par.w = 5.0; 
+            par.x = 2.0;
+
+            assert(par.gamma >= 0.0, 'Cost coefficient must be non-negative.');
+            assert(par.sigma_eps > 0, 'Std dev of shocks must be positive.');
+            assert(abs(par.rho) < 1, 'Persistence must be less than 1 in absolute value.');
+
+            %% Simulation parameters
+            par.seed = 2025; % RNG seed
+            par.T = 300; % Time periods
+            par.N = 30; % Number of firms
+        end
+        
+        %% Generate state grids.
+        
+        function par = gen_grids(par)
+            %% Capital grid.
+
+            par.klen = 300; % Grid size for a.
+            par.kmax = 30.0; % Upper bound for a.
+            par.kmin = 1e-4; % Minimum a.
+            
+            assert(par.klen > 5,'Grid size for k should be positive and greater than 5.\n')
+            assert(par.kmax > par.kmin,'Minimum k should be less than maximum value.\n')
+            
+            par.kgrid = linspace(par.kmin,par.kmax,par.klen)'; % Equally spaced, linear grid for a and a'.
+                
+            %% Discretized income process.
+                  
+            par.Alen = 7; % Grid size for y.
+            par.m = 3; % Scaling parameter for Tauchen.
+            
+            assert(par.Alen > 3,'Grid size for A should be positive and greater than 3.\n')
+            assert(par.m > 0,'Scaling parameter for Tauchen should be positive.\n')
+            
+            [Agrid,pmat] = model.tauchen(par.mu,par.rho,par.sigma_eps,par.Alen,par.m); % Tauchen's Method to discretize the AR(1) process for log productivity.
+            par.Agrid = exp(Agrid); % The AR(1) is in logs so exponentiate it to get A.
+            par.pmat = pmat; % Transition matrix.
+
+            par.plen = 7;
+            assert(par.plen > 3,'Grid size for A should be positive and greater than 3.\n')
+            %assert(par.m > 0,'Scaling parameter for Tauchen should be positive.\n')
+            [pgrid, pmatP] = model.tauchen(par.mu, par.rho, par.sigma_eps, par.plen, par.m);
+            par.pgrid = exp(pgrid);
+            par.pmat_p = pmatP;
+            disp(pmat);
+            disp(pmatP)
+        
+        end
+        
+        %% Tauchen's Method
+        
+        function [y,pi] = tauchen(mu,rho,sigma,N,m)
+            %% Construct equally spaced grid.
+        
+            ar_mean = mu/(1-rho); % The mean of a stationary AR(1) process is mu/(1-rho).
+            ar_sd = sigma/((1-rho^2)^(1/2)); % The std. dev of a stationary AR(1) process is sigma/sqrt(1-rho^2)
+            
+            y1 = ar_mean-(m*ar_sd); % Smallest grid point is the mean of the AR(1) process minus m*std.dev of AR(1) process.
+            yn = ar_mean+(m*ar_sd); % Largest grid point is the mean of the AR(1) process plus m*std.dev of AR(1) process.
+            
+	        y = linspace(y1,yn,N); % Equally spaced grid.
+            d = y(2)-y(1); % Step size.
+	        
+	        %% Compute transition probability matrix from state j (row) to k (column).
+        
+            ymatk = repmat(y,N,1); % States next period.
+            ymatj = mu+rho*ymatk'; % States this period.
+        
+	        pi = normcdf(ymatk,ymatj-(d/2),sigma) - normcdf(ymatk,ymatj+(d/2),sigma); % Transition probabilities to state 2, ..., N-1.
+	        pi(:,1) = normcdf(y(1),mu+rho*y-(d/2),sigma); % Transition probabilities to state 1.
+	        pi(:,N) = 1 - normcdf(y(N),mu+rho*y+(d/2),sigma); % Transition probabilities to state N.
+	        
+        end
+        
+        
+        %% Revenue function.
+        
+        function output = production(A,k,par)
+            %% Revenue function.
+            
+            output = A.*k.^par.alpha; % Cobb-Douglas production.
+                        
+        end
+        
+        %% Cost function.
+        
+        function cost = total_cost(k1, k0, p, par)
+            invest = k1 - (1 - par.delta) * k0;
+            adj_cost = (par.gamma / 2) * ((invest ./ k0).^2) .* k0;
+            cost = adj_cost + p * invest;
+        end
+    end
+end

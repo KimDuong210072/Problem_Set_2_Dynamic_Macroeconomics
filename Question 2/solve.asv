@@ -1,0 +1,110 @@
+%% File Info.
+%{
+    solve.m
+    -------
+    This code solves the model.
+%}
+
+%% Solve class.
+
+classdef solve
+    methods(Static)
+        %% Solve the model using VFI. 
+        
+        function sol = firm_problem(par)            
+            %% Structure array for model solution.
+            
+            sol = struct();
+            
+            %% Model parameters, grids and functions.
+            
+            beta = par.beta;       % Discount factor.
+            delta = par.delta;     % Depreciation rate.
+
+            klen = par.klen;
+            kgrid = par.kgrid;
+
+            Alen = par.Alen;
+            Agrid = par.Agrid;
+            pmat = par.pmat;       % Transition matrix for productivity A
+
+            plen = par.plen;
+            pgrid = par.pgrid;
+            pmatp = par.pmat_p;    % Transition matrix for price
+
+            w = par.w;
+            x = par.x;
+
+            %% Value Function iteration.
+            v0 = zeros(klen, Alen, plen);
+            v1 = nan(klen, Alen, plen);
+            k1 = nan(klen, Alen, plen);
+            i1 = nan(klen, Alen, plen);
+            r1 = nan(klen, Alen, plen);
+            e1 = nan(klen, Alen, plen);
+            p1 = nan(klen, Alen, plen);
+        
+            crit = 1e-6;
+            maxiter = 10000;
+            diff = 1;
+            iter = 0;
+        
+            fprintf('------------Beginning Value Function Iteration.------------\n'
+            
+            while diff > tol && iter < maxiter
+                for iA = 1:par.Alen
+                    A = par.Agrid(iA);
+                    for iP = 1:par.plen
+                        p = par.pgrid(iP);
+                        for ik = 1:par.klen
+                            k0 = par.kgrid(ik);
+            
+                            % Loop over all possible k1 choices
+                            Vchoices = zeros(par.klen, 1);
+                            for ikp = 1:par.klen
+                                k1 = par.kgrid(ikp);
+            
+                                % Compute revenue and cost
+                                rev = model.production(A, k0, par);
+                                cst = model.total_cost(k1, k0, p, par);
+            
+                                % Compute expected value
+                                EV = 0;
+                                for iA2 = 1:par.Alen
+                                    for iP2 = 1:par.plen
+                                        prob = par.pmat(iA, iA2) * par.pmat_p(iP, iP2);
+                                        EV = EV + prob * V(ikp, iA2, iP2);  % Note: uses ikp
+                                    end
+                                end
+            
+                                Vchoices(ikp) = rev - cst + par.beta * EV;
+                            end
+            
+                            % Choose maximum value and associated capital choice
+                            [Vnew(ik, iA, iP), best_kp_idx] = max(Vchoices);
+                            policy_kprime(ik, iA, iP) = par.kgrid(best_kp_idx);
+                        end
+                    end
+                end
+            
+                % Check convergence
+                diff = max(abs(Vnew(:) - V(:)));
+                V = Vnew;
+                iter = iter + 1;
+                fprintf("Iteration %d, diff = %.8f\n", iter, diff);
+            end
+
+        
+            fprintf('\nConverged in %d iterations.\n\n', iter)
+            fprintf('------------End of Value Function Iteration.------------\n')
+        
+            % Store results
+            sol.v = v1; %Firm value
+            sol.k = k1; %Capital policy function
+            sol.i = i1; %Investment policy function
+            sol.r = r1; %Revenue function
+            sol.e = e1; %Investment expenditure function
+            sol.p = p1; %Profit function
+        end
+    end
+end    
